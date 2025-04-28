@@ -50,3 +50,10 @@ jobs:
       - run: npm ci
       # 第四步：执行 package.json 里的 build命令；
       - run: npm run build-prod --if-present
+
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build           # UI 上显示的名称
+          path: dist/**             # 你要保存的文件/文件夹
+          retention-days: 14        # (可选) 保存天数，默认 90
