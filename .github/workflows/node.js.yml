@@ -1,0 +1,52 @@
+# 在.github/workflows/cicd.yaml文件中：
+
+# 给此pipeline起个名字，描述此pipeline干了些什么，可选参数；
+name: Node.js CI
+
+# 这里定义events，一旦触发其中一个event，就会执行下面的jobs的内容，必写项；
+# 这里还可以定义比如contributor加入了项目、给task加上了label等event；
+on:
+  # event：push到main branch，一旦触发了此action，就会执行下面的jobs里的流程；
+  push:
+    branches: [ "main" ]
+  # event：当有 PR 以 main 为目标分支时触发，一旦触发了此action，就会执行下面的jobs里的流程；
+  pull_request:
+    branches: [ "main" ]
+
+# 当上面的on里面的event触发时，就会走下面的流程；
+# 注意！jobs里面的每一个job都是在单独的github server下进行的，而且所有的job都是并行执行！
+jobs:
+  # 定义一个job，叫build，可以起任何名字；
+  build:
+    # 告诉 GitHub 使用最新的 Ubuntu 映像；
+    runs-on: ubuntu-latest
+
+    # 同一套步骤会并行跑 3 遍，分别在 Node 18、20、22 上执行，从而完成“多版本兼容性验证”；
+    strategy:
+      # 任一版本失败时，不立刻取消其他版本，让 3 个版本全部跑完再给结论，方便一次看清哪些版本失败、哪些通过；
+      fail-fast: false
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+
+    # 定义具体执行的步骤；
+    steps:
+      # 第一步：执行github的actions中别人写好的checkout这个action，此action是在checkout code；
+      # 使用uses来定义使用哪个action；
+      - uses: actions/checkout@v4
+      # 第二步：给第二步起个名字，然后定义第二步要做什么；
+      - name: Use Node.js ${{ matrix.node-version }}
+        # 执行github的actions中别人写好的setup-node来创建好node环境；
+        uses: actions/setup-node@v4
+        with:
+          # 使用的node版本是上面的strategy -> matrix -> node-version里的版本，即[18.x, 20.x, 22.x]3个版本；
+          node-version: ${{ matrix.node-version }}
+          # 开启 ~/.npm 缓存，同一个依赖版本下次复用，可显著加速安装；
+          cache: 'npm'
+
+      # 第三步：安装dependencie；
+      # 如果要运行某个命令，则使用run来定义；
+      # npm ci 基于 package-lock.json 做 干净、可复现 的安装，比 npm install 快且不会修改锁文件。
+      # 失败即表明锁文件或依赖树有问题；
+      - run: npm ci
+      # 第四步：执行 package.json 里的 build命令；
+      - run: npm run build-prod --if-present
